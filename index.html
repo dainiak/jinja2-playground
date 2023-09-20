@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jinja2 Renderer with Pyodide</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/ace-builds@1.26.0/css/ace.min.css" rel="stylesheet">
+    <script type="text/javascript">
+        window.languagePluginUrl = 'https://cdn.jsdelivr.net/pyodide/v0.24.0/full/';
+    </script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/pyodide/v0.24.0/full/pyodide.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/ace-builds@1.26.0/src-min-noconflict/ace.min.js"></script>
+
+    <style>
+        body {
+            background-color: #343a40;
+            color: #f8f9fa;
+        }
+        #output {
+            border: 1px solid #6c757d;
+            padding: 10px;
+            height: 85vh;
+            overflow-y: auto;
+        }
+        #template, #variables {
+            height: 40vh;
+        }
+        #loader {
+            position: fixed;
+            top: 50vh;
+            left: 50vw;
+            transform: translate(-50%, -50%);
+            background: black;
+            z-index: 10;
+            border-radius: 30px;
+            padding: 20px;
+            text-align: center;
+        }
+        .loaded #loader {
+            display: none;
+        }
+        body:not(.loaded) #main {
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+<div id="loader"><h1>Loading… Takes about 2-5 seconds.</h1></div>
+
+<div id="main" class="container mt-5">
+    <div class="row">
+        <div class="col-md-6">
+            <h3>Template</h3>
+            <div id="template"></div>
+            <h3 class="mt-3">Variables (JSON format)</h3>
+            <div id="variables"></div>
+        </div>
+        <div class="col-md-6">
+            <h3>Output</h3>
+            <div id="output" class="bg-dark"></div>
+        </div>
+    </div>
+</div>
+
+
+<script type="text/javascript">
+    async function renderTemplate() {
+        const templateString = window.templateEditor.getSession().getValue();
+        const variablesString = window.varsEditor.getSession().getValue();
+
+        localStorage.setItem('templateString', templateString);
+        localStorage.setItem('variablesString', variablesString);
+
+        try {
+            const rendered = pyodide.runPython(
+                `
+from jinja2 import Template
+import json
+
+template = Template(r'''${templateString}''')
+variables = json.loads(r'''${variablesString}''')
+rendered = template.render(variables)
+rendered
+`);
+
+            window.resultEditor.getSession().setValue(rendered);
+        } catch (error) {
+            window.resultEditor.getSession().setValue('Error: ' + error.toString());
+        }
+    }
+    
+    async function main() {
+        window.pyodide = await loadPyodide();
+        await pyodide.loadPackage('jinja2')
+
+        window.templateEditor = window.ace.edit('template');
+        window.templateEditor.setOptions({mode: 'ace/mode/django'});
+        window.varsEditor = window.ace.edit('variables');
+        window.varsEditor.setOptions({mode: 'ace/mode/json'});
+
+        window.resultEditor = window.ace.edit('output');
+        window.resultEditor.setOptions({mode: 'ace/mode/text'});
+
+        window.templateEditor.getSession().setValue(
+            localStorage.getItem('templateString') || 'Hello, {{ name }}!'
+        );
+        window.varsEditor.getSession().setValue(
+            localStorage.getItem('variablesString') || '{"name": "World"}'
+        );
+
+        for(const editor of [window.templateEditor, window.varsEditor]) {
+            editor.getSession().on('change', renderTemplate);
+        }
+
+        for(const editor of [window.templateEditor, window.varsEditor, window.resultEditor]) {
+            editor.setOptions({
+                theme: 'ace/theme/twilight',
+                wrap: true,
+                showGutter: true,
+                fadeFoldWidgets: false,
+                showFoldWidgets: false,
+                showPrintMargin: false,
+                highlightActiveLine: true,
+                enableBasicAutocompletion: true
+            });
+        }
+
+        document.body.classList.add('loaded');
+
+        await renderTemplate();
+    }
+
+    main();
+</script>
+</body>
+</html>
