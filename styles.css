@@ -1,0 +1,30 @@
+body {
+    background-color: #343a40;
+    color: #f8f9fa;
+}
+#output {
+    border: 1px solid #6c757d;
+    padding: 10px;
+    height: 85vh;
+    overflow-y: auto;
+}
+#template, #variables {
+    height: 40vh;
+}
+#loader {
+    position: fixed;
+    top: 50vh;
+    left: 50vw;
+    transform: translate(-50%, -50%);
+    background: black;
+    z-index: 10;
+    border-radius: 30px;
+    padding: 20px;
+    text-align: center;
+}
+.loaded #loader {
+    display: none;
+}
+body:not(.loaded) #main {
+    opacity: 0.3;
+}
