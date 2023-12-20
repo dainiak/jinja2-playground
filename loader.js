@@ -9,10 +9,8 @@ async function renderTemplate() {
         const rendered = pyodide.runPython(
             `
 from jinja2 import Template
-import json
-
-template = Template(r'''${templateString}''')
-variables = json.loads(r'''${variablesString}''')
+template = Template(${JSON.stringify(templateString)})
+variables = ${variablesString}
 rendered = template.render(variables)
 rendered
 `);
