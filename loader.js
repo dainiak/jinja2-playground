@@ -43,7 +43,7 @@ rendered
         window.templateEditor.getSession().setAnnotations([]);
     } catch (error) {
         let errorText = `Error: ${error.toString()}`;
-        let m = error.toString().match(/.*File ".*", (line \d+, in template.*)/s);
+        let m = error.toString().match(/.*File ".*", (line \d+, in.{0,10} template.*)/s);
 
         if(m) {
             const line = parseInt(m[1].match(/line (\d+)/)[1]) - 1;
