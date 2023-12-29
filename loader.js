@@ -27,27 +27,25 @@ rendered
             );
             undefinedVars = [...new Set(undefinedVars)];
 
-            if (undefinedVars && undefinedVars.length >= 1) {
+            if (undefinedVars && undefinedVars.length >= 1)
                 window.resultEditor.getSession().setAnnotations([{
                     row: 0,
                     text: `The following template variable${undefinedVars.length > 1 ? 's are' : ' is'} not defined: ${undefinedVars.join(', ')}`,
                     type: 'warning'
                 }]);
-            }
-            else{
+            else
                 window.resultEditor.getSession().setAnnotations([]);
-            }
         }
-        catch (error) {
-        }
+        catch (error) {}
+
         window.templateEditor.getSession().setAnnotations([]);
     } catch (error) {
         let errorText = `Error: ${error.toString()}`;
-        let m = error.toString().match(/.*File ".*", (line \d+, in.{0,10} template.*)/s);
+        let match = error.toString().match(/.*File ".*", (line \d+, in.{0,10} template.*)/s);
 
-        if(m) {
-            const line = parseInt(m[1].match(/line (\d+)/)[1]) - 1;
-            errorText = `Error on ${m[1].trim().replace('jinja2.exceptions.', '')}`;
+        if(match) {
+            const line = parseInt(match[1].match(/line (\d+)/)[1]) - 1;
+            errorText = `Error on ${match[1].trim().replace('jinja2.exceptions.', '')}`;
             let charMatch = errorText.match(/.* at (\d+)$/);
             let char = 0;
             if (charMatch) {
@@ -58,20 +56,20 @@ rendered
             window.templateEditor.getSession().setAnnotations([{
                 row: line,
                 column: char,
-                text: m[1].trim().replace('jinja2.exceptions.', ''),
+                text: match[1].trim().replace('jinja2.exceptions.', ''),
                 type: 'error'
             }]);
         }
         else {
-            m = error.toString().match(/.*File "<exec>+", line (\d+)(.*)/s);
-            if(m) {
-                const line = parseInt(m[1]);
+            match = error.toString().match(/.*File "<exec>+", line (\d+)(.*)/s);
+            if(match) {
+                const line = parseInt(match[1]);
                 const lineInVars = line - 3;
-                const subError = m[2].trim().replace(RegExp(`line ${line}`), `line ${lineInVars}`);
+                const subError = match[2].trim().replace(RegExp(`line ${line}`), `line ${lineInVars}`);
                 errorText = `Error on line ${lineInVars} in variable definitions: ${subError}`;
                 window.varsEditor.getSession().setAnnotations([{
                     row: lineInVars,
-                    text: m[1],
+                    text: match[1],
                     type: 'error'
                 }]);
             }
