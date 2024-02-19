@@ -19,9 +19,8 @@ json.dumps(list(set(find_undeclared_variables(parsed_content))))
     catch (error){}
 
     try {
-        [window.varsEditor, window.templateEditor, window.resultEditor].map(
-            editor => editor.getSession().clearAnnotations()
-        );
+        for(const editor of [window.varsEditor, window.templateEditor, window.resultEditor])
+            editor.getSession().clearAnnotations();
 
         const rendered = pyodide.runPython(
 `from jinja2 import Template, StrictUndefined, DebugUndefined
@@ -53,7 +52,6 @@ rendered
         let errorText = `Error: ${error.toString()}`;
         let match = error.toString().match(/.*File ".*", (line \d+, in.{0,10} template.*)/s);
 
-
         if(match) {
             const line = parseInt(match[1].match(/line (\d+)/)[1]) - 1;
             errorText = `Error on ${match[1].trim().replace('jinja2.exceptions.', '')}`;
@@ -63,11 +61,17 @@ rendered
                 const stringsBeforeChar = templateString.substring(0, parseInt(charMatch[1])).split('\n');
                 char = stringsBeforeChar ? stringsBeforeChar[stringsBeforeChar.length - 1].length : 0;
             }
+            errorText = match[1].trim().replace('jinja2.exceptions.', '');
+
+            match = errorText.match(/.*(UndefinedError: .*)/);
+            if(match) {
+                errorText = match[1];
+            }
 
             window.templateEditor.getSession().setAnnotations([{
                 row: line,
                 column: char,
-                text: match[1].trim().replace('jinja2.exceptions.', ''),
+                text: errorText,
                 type: 'error'
             }]);
         }
