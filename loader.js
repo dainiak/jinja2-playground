@@ -1,14 +1,31 @@
 async function renderTemplate() {
     const templateString = window.templateEditor.getSession().getValue();
     const variablesString = window.varsEditor.getSession().getValue();
+    const stopOnUndefined = false;
 
     localStorage.setItem('templateString', templateString);
     localStorage.setItem('variablesString', variablesString);
 
+    let templateVariables;
     try {
+        templateVariables = JSON.parse(pyodide.runPython(
+`from jinja2 import Template, Environment
+from jinja2.meta import find_undeclared_variables
+import json
+parsed_content = Environment().parse(${JSON.stringify(templateString)})
+json.dumps(list(set(find_undeclared_variables(parsed_content))))
+`));
+    }
+    catch (error){}
+
+    try {
+        [window.varsEditor, window.templateEditor, window.resultEditor].map(
+            editor => editor.getSession().clearAnnotations()
+        );
+
         const rendered = pyodide.runPython(
-`from jinja2 import Template
-template = Template(${JSON.stringify(templateString)})
+`from jinja2 import Template, StrictUndefined, DebugUndefined
+template = Template(${JSON.stringify(templateString)}${stopOnUndefined ? ", undefined=StrictUndefined": ""})
 variables = (
 ${variablesString}
 )
@@ -18,11 +35,7 @@ rendered
         window.resultEditor.getSession().setValue(rendered);
         try {
             const variables = JSON.parse(variablesString);
-            let undefinedVars = templateString.match(
-                /\{\{-?\s*(\w+)\s*-?}}/g
-            ).map(
-                s => s.match(/\w+/)[0]
-            ).filter(
+            let undefinedVars = templateVariables.filter(
                 v => !variables.hasOwnProperty(v)
             );
             undefinedVars = [...new Set(undefinedVars)];
@@ -33,15 +46,13 @@ rendered
                     text: `The following template variable${undefinedVars.length > 1 ? 's are' : ' is'} not defined: ${undefinedVars.join(', ')}`,
                     type: 'warning'
                 }]);
-            else
-                window.resultEditor.getSession().setAnnotations([]);
         }
         catch (error) {}
 
-        window.templateEditor.getSession().setAnnotations([]);
     } catch (error) {
         let errorText = `Error: ${error.toString()}`;
         let match = error.toString().match(/.*File ".*", (line \d+, in.{0,10} template.*)/s);
+
 
         if(match) {
             const line = parseInt(match[1].match(/line (\d+)/)[1]) - 1;
@@ -68,8 +79,8 @@ rendered
                 const subError = match[2].trim().replace(RegExp(`line ${line}`), `line ${lineInVars}`);
                 errorText = `Error on line ${lineInVars} in variable definitions: ${subError}`;
                 window.varsEditor.getSession().setAnnotations([{
-                    row: lineInVars,
-                    text: match[1],
+                    row: lineInVars - 1,
+                    text: subError,
                     type: 'error'
                 }]);
             }
@@ -85,7 +96,7 @@ async function main() {
     window.templateEditor = window.ace.edit('template');
     window.templateEditor.setOptions({mode: 'ace/mode/django'});
     window.varsEditor = window.ace.edit('variables');
-    window.varsEditor.setOptions({mode: 'ace/mode/json'});
+    window.varsEditor.setOptions({mode: 'ace/mode/python'});
     window.resultEditor = window.ace.edit('output');
     window.resultEditor.setOptions({mode: 'ace/mode/text'});
 
