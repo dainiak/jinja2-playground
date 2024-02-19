@@ -91,9 +91,50 @@ rendered
         }
         window.resultEditor.getSession().setValue(errorText);
     }
+    setSharingLink({templateString, variablesString});
+}
+
+function setSharingLink(obj) {
+    const hash = window.btoa(Array.from(pako.gzip(JSON.stringify(obj), {level: 9})).map((byte) => String.fromCharCode(byte)).join(''));
+    const baseURL= window.location.href.split('#')[0];
+    document.getElementById("sharinglink").href = `${baseURL}#${hash}`;
+}
+
+function copyLinkToClipboard() {
+    navigator.clipboard.writeText(document.getElementById("sharinglink").href).then(() => {
+        const copyButton = document.getElementById('copybutton');
+        const copyIcon = document.getElementById("copyicon");
+        const copiedIcon = document.getElementById("copiedicon");
+        copyIcon.style.display = 'none';
+        copiedIcon.style.display = 'inline';
+        copyButton.disabled = true;
+
+        setTimeout(() => {
+            copyIcon.style.display = 'inline';
+            copiedIcon.style.display = 'none';
+            copyButton.disabled = false;
+        }, 3000);
+    }).catch(err => {
+        console.error('Error copying text to clipboard', err);
+    });
+}
+
+function getDataFromLocationHash() {
+    try {
+        const charCodeArray = Array.from(window.atob(window.location.hash.substring(1))).map((char) => char.charCodeAt(0));
+        const obj = JSON.parse(pako.inflate(new Uint8Array(charCodeArray), { to: 'string' }));
+        window.templateEditor.getSession().setValue(obj.templateString);
+        window.varsEditor.getSession().setValue(obj.variablesString);
+    }
+    catch {
+        window.templateEditor.getSession().setValue(localStorage.getItem('templateString') || 'Hello, {{ name }}!');
+        window.varsEditor.getSession().setValue(localStorage.getItem('variablesString') || '{"name": "World"}');
+    }
 }
 
 async function main() {
+    document.getElementById('copybutton').addEventListener('click', copyLinkToClipboard);
+
     window.pyodide = await loadPyodide();
     await pyodide.loadPackage('jinja2')
 
@@ -104,8 +145,7 @@ async function main() {
     window.resultEditor = window.ace.edit('output');
     window.resultEditor.setOptions({mode: 'ace/mode/text'});
 
-    window.templateEditor.getSession().setValue(localStorage.getItem('templateString') || 'Hello, {{ name }}!');
-    window.varsEditor.getSession().setValue(localStorage.getItem('variablesString') || '{"name": "World"}');
+    getDataFromLocationHash();
 
     for(const editor of [window.templateEditor, window.varsEditor])
         editor.getSession().on('change', renderTemplate);
