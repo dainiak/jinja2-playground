@@ -95,7 +95,8 @@ rendered
 }
 
 function setSharingLink(obj) {
-    const hash = window.btoa(Array.from(pako.gzip(JSON.stringify(obj), {level: 9})).map((byte) => String.fromCharCode(byte)).join(''));
+    let hash = window.btoa(Array.from(pako.gzip(JSON.stringify(obj), {level: 9})).map((byte) => String.fromCharCode(byte)).join(''));
+    hash = hash.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     const baseURL= window.location.href.split('#')[0];
     document.getElementById("sharinglink").href = `${baseURL}#${hash}`;
 }
@@ -121,7 +122,9 @@ function copyLinkToClipboard() {
 
 function getDataFromLocationHash() {
     try {
-        const charCodeArray = Array.from(window.atob(window.location.hash.substring(1))).map((char) => char.charCodeAt(0));
+        let hash = window.location.hash.substring(1);
+        hash = hash.replace(/-/g, '+').replace(/_/g, '/');
+        const charCodeArray = Array.from(window.atob(hash)).map((char) => char.charCodeAt(0));
         const obj = JSON.parse(pako.inflate(new Uint8Array(charCodeArray), { to: 'string' }));
         window.templateEditor.getSession().setValue(obj.templateString);
         window.varsEditor.getSession().setValue(obj.variablesString);
