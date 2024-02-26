@@ -1,6 +1,11 @@
+html {
+    height: 90%;
+}
+
 body {
     background-color: #343a40;
     color: #f8f9fa;
+    height: 100%;
 }
 #output {
     border: 1px solid #6c757d;
@@ -8,9 +13,21 @@ body {
     height: 85vh;
     overflow-y: auto;
 }
-#template, #variables {
-    height: 40vh;
+
+.left-col-container {
+    flex: 0 0 50%;
 }
+
+.flex-fill-custom, #template, #variables {
+    flex: 1;
+    overflow: auto;
+}
+
+.d-flex.flex-row {
+    align-items: center;
+    justify-content: right;
+}
+
 #loader {
     display: flex;
     flex-direction: column;
