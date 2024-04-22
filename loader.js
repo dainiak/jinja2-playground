@@ -114,7 +114,7 @@ function copyLinkToClipboard() {
             copyIcon.style.display = 'inline';
             copiedIcon.style.display = 'none';
             copyButton.disabled = false;
-        }, 3000);
+        }, 2000);
     }).catch(err => {
         console.error('Error copying text to clipboard', err);
     });
