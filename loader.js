@@ -43,27 +43,34 @@ json.dumps(diagnostics if parsed_content is None else [list(set(find_undeclared_
     let userVariablesDiagnostics = [];
 
     try {
+        let jsonVars = JSON.stringify(variablesString);
+        jsonVars = jsonVars.slice(1, jsonVars.length-1);
         userVariablesDiagnostics = JSON.parse(pyodide.runPython(
-`import json, traceback
+`import json, traceback, ast
 from datetime import datetime
 
+error_report = None
 try:
-    result = dict(
-${variablesString}
-)
+    ast.parse("${jsonVars}")
+    result = eval("${jsonVars}")
 except Exception as e:
-    traceback_ = traceback.extract_tb(e.__traceback__)[0]
-    result = [e.__class__.__name__, str(e), traceback_.lineno, traceback_.colno]
+    traceback_ = traceback.extract_tb(e.__traceback__)[1]
+    error_report = [e.__class__.__name__, str(e), traceback_.lineno, traceback_.colno]
 
-json.dumps([] if isinstance(result, dict) else result)
+json.dumps(error_report if error_report else ([] if isinstance(result, dict) else ["TypeError", "Variables should be defined as a dictionary", 1, 1]))
 `));
     }
     catch (error) {}
 
     if (userVariablesDiagnostics.length > 0) {
-        const [errorClass, errorText, line, col] = userVariablesDiagnostics;
+        let [errorClass, errorText, line, col] = userVariablesDiagnostics;
+        const match = errorText.match(/^(.*)\(<unknown>, line (\d+)\)$/);
+        if(match){
+            errorText = match[1].trim();
+            line = parseInt(match[2]);
+        }
         window.varsEditor.getSession().setAnnotations([{
-            row: line - 6,
+            row: line-1,
             col: col,
             text: `${errorClass}: ${errorText}`,
             type: 'error'
