@@ -3,16 +3,18 @@ html {
 }
 
 body {
-    background-color: #343a40;
-    color: #f8f9fa;
     height: 100%;
 }
 
-#output {
+#output, #template, #variables {
     border: 1px solid #6c757d;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+#output {
     padding: 10px;
     height: 85vh;
-    overflow-y: auto;
 }
 
 #copybutton {

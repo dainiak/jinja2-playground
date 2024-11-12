@@ -1,96 +1,163 @@
 async function renderTemplate() {
     const templateString = window.templateEditor.getSession().getValue();
     const variablesString = window.varsEditor.getSession().getValue();
-    const stopOnUndefined = false;
 
     localStorage.setItem('templateString', templateString);
     localStorage.setItem('variablesString', variablesString);
 
-    let templateVariables;
+    for(const editor of [window.varsEditor, window.templateEditor, window.resultEditor])
+        editor.getSession().clearAnnotations();
+
+    let fatalError = "";
+
+    let templateDiagnostics = [];
     try {
-        templateVariables = JSON.parse(pyodide.runPython(
+        templateDiagnostics = JSON.parse(pyodide.runPython(
 `from jinja2 import Template, Environment
 from jinja2.meta import find_undeclared_variables
-import json
-parsed_content = Environment().parse(${JSON.stringify(templateString)})
-json.dumps(list(set(find_undeclared_variables(parsed_content))))
+import json, traceback
+
+parsed_content = None
+try:
+    parsed_content = Environment().parse(${JSON.stringify(templateString)})
+except Exception as e:
+    traceback_ = traceback.extract_tb(e.__traceback__)[3]
+    diagnostics = [e.__class__.__name__, str(e), traceback_.lineno, traceback_.colno]
+
+json.dumps(diagnostics if parsed_content is None else [list(set(find_undeclared_variables(parsed_content)))])
 `));
     }
     catch (error){}
 
-    try {
-        for(const editor of [window.varsEditor, window.templateEditor, window.resultEditor])
-            editor.getSession().clearAnnotations();
+    if (templateDiagnostics.length > 1) {
+        const [errorClass, errorText, line, col] = templateDiagnostics;
+        window.templateEditor.getSession().setAnnotations([{
+            row: line-1,
+            col: col,
+            text: `${errorClass}: ${errorText}`,
+            type: 'error'
+        }]);
+        fatalError = `Error in the template text:\n${errorClass}: ${errorText}`;
+    }
 
-        const rendered = pyodide.runPython(
-`from jinja2 import Template, StrictUndefined, DebugUndefined
-template = Template(${JSON.stringify(templateString)}${stopOnUndefined ? ", undefined=StrictUndefined": ""})
+    let userVariablesDiagnostics = [];
+
+    try {
+        userVariablesDiagnostics = JSON.parse(pyodide.runPython(
+`import json, traceback
+from datetime import datetime
+
+try:
+    result = dict(
+${variablesString}
+)
+except Exception as e:
+    traceback_ = traceback.extract_tb(e.__traceback__)[0]
+    result = [e.__class__.__name__, str(e), traceback_.lineno, traceback_.colno]
+
+json.dumps([] if isinstance(result, dict) else result)
+`));
+    }
+    catch (error) {}
+
+    if (userVariablesDiagnostics.length > 0) {
+        const [errorClass, errorText, line, col] = userVariablesDiagnostics;
+        window.varsEditor.getSession().setAnnotations([{
+            row: line - 6,
+            col: col,
+            text: `${errorClass}: ${errorText}`,
+            type: 'error'
+        }]);
+        fatalError = `${fatalError ? fatalError + "\n\n": ""}Error in the variable definitions:\n${errorClass}: ${errorText}`;
+    }
+
+    if (fatalError) {
+        window.resultEditor.getSession().setValue(fatalError);
+        return;
+    }
+
+    const templateVariables = templateDiagnostics[0];
+    let [extraVars, undefinedVars] = JSON.parse(pyodide.runPython(
+`import json
+from datetime import datetime
+
+user_vars = set(
+${variablesString}
+)
+template_vars = set(${JSON.stringify(templateVariables)})
+json.dumps([list(user_vars - template_vars), list(template_vars - user_vars)])
+`));
+
+    if (extraVars.length >= 1)
+        window.varsEditor.getSession().setAnnotations([{
+            row: 0,
+            text: `The following user variable${extraVars.length > 1 ? 's are' : ' is'} not mentioned in the template: ${extraVars.join(', ')}`,
+            type: 'warning'
+        }]);
+
+    const undefinedVariablesDiagnostics = JSON.parse(pyodide.runPython(
+`from jinja2 import Template, StrictUndefined
+import json
+from datetime import datetime
+template = Template(
+${JSON.stringify(templateString)}, undefined=StrictUndefined
+)
 variables = (
 ${variablesString}
 )
-rendered = template.render(variables)
-rendered
-`);
-        window.resultEditor.getSession().setValue(rendered);
-        try {
-            const variables = JSON.parse(variablesString);
-            let undefinedVars = templateVariables.filter(
-                v => !variables.hasOwnProperty(v)
-            );
-            undefinedVars = [...new Set(undefinedVars)];
+result = []
+try:
+    template.render(variables)
+except Exception as e:
+    traceback_ = traceback.extract_tb(e.__traceback__)[3]
+    result = [e.__class__.__name__, str(e), traceback_.lineno, traceback_.colno]
 
-            if (undefinedVars && undefinedVars.length >= 1)
-                window.resultEditor.getSession().setAnnotations([{
-                    row: 0,
-                    text: `The following template variable${undefinedVars.length > 1 ? 's are' : ' is'} not defined: ${undefinedVars.join(', ')}`,
-                    type: 'warning'
-                }]);
+json.dumps(result)
+`));
+    if(undefinedVariablesDiagnostics.length > 0 && undefinedVars.length > 0) {
+        const [errorClass, errorText, line, col] = undefinedVariablesDiagnostics;
+        if(errorClass === 'UndefinedError') {
+            let undefinedVar = errorText.match(/'(.*)' is undefined/)[1];
+            if(undefinedVars.includes(undefinedVar))
+                undefinedVars = [undefinedVar, ...undefinedVars.filter(v => v !== undefinedVar)];
         }
-        catch (error) {}
 
-    } catch (error) {
-        let errorText = `Error: ${error.toString()}`;
-        let match = error.toString().match(/.*File ".*", (line \d+, in.{0,10} template.*)/s);
+        window.templateEditor.getSession().setAnnotations([{
+            row: line - 1,
+            col: col,
+            text: `The following template variable${undefinedVars.length > 1 ? 's are' : ' is'} not defined: ${undefinedVars.join(', ')}`,
+            type: 'warning'
+        }]);
+    }
 
-        if(match) {
-            const line = parseInt(match[1].match(/line (\d+)/)[1]) - 1;
-            errorText = `Error on ${match[1].trim().replace('jinja2.exceptions.', '')}`;
-            let charMatch = errorText.match(/.* at (\d+)$/);
-            let char = 0;
-            if (charMatch) {
-                const stringsBeforeChar = templateString.substring(0, parseInt(charMatch[1])).split('\n');
-                char = stringsBeforeChar ? stringsBeforeChar[stringsBeforeChar.length - 1].length : 0;
-            }
-            errorText = match[1].trim().replace('jinja2.exceptions.', '');
+    const result = JSON.parse(pyodide.runPython(
+`from jinja2 import Template
+import json
+from datetime import datetime
+result = []
+try:
+    result = [Template(${JSON.stringify(templateString)}).render(${variablesString})]
+except Exception as e:
+    traceback_ = traceback.extract_tb(e.__traceback__)[3]
+    result = [e.__class__.__name__, str(e), traceback_.lineno, traceback_.colno]
 
-            match = errorText.match(/.*(UndefinedError: .*)/);
-            if(match) {
-                errorText = match[1];
-            }
+json.dumps(result)
+`));
 
-            window.templateEditor.getSession().setAnnotations([{
-                row: line,
-                column: char,
-                text: errorText,
-                type: 'error'
-            }]);
-        }
-        else {
-            match = error.toString().match(/.*File "<exec>+", line (\d+)(.*)/s);
-            if(match) {
-                const line = parseInt(match[1]);
-                const lineInVars = line - 3;
-                const subError = match[2].trim().replace(RegExp(`line ${line}`), `line ${lineInVars}`);
-                errorText = `Error on line ${lineInVars} in variable definitions: ${subError}`;
-                window.varsEditor.getSession().setAnnotations([{
-                    row: lineInVars - 1,
-                    text: subError,
-                    type: 'error'
-                }]);
-            }
-        }
+    if(result.length > 1) {
+        const [errorClass, errorText, line, col] = result;
+        window.templateEditor.getSession().setAnnotations([{
+            row: line - 1,
+            col: col,
+            text: `${errorClass}: ${errorText}`,
+            type: 'error'
+        }]);
         window.resultEditor.getSession().setValue(errorText);
     }
+    else{
+        window.resultEditor.getSession().setValue(result[0]);
+    }
+
     setSharingLink({templateString, variablesString});
 }
 
@@ -136,10 +203,13 @@ function getDataFromLocationHash() {
 }
 
 async function main() {
+    const isInDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.body && document.body.setAttribute("data-bs-theme", isInDarkMode ? "dark" : "light");
+
     document.getElementById('copybutton').addEventListener('click', copyLinkToClipboard);
 
     window.pyodide = await loadPyodide();
-    await pyodide.loadPackage('jinja2')
+    await pyodide.loadPackage('jinja2');
 
     window.templateEditor = window.ace.edit('template');
     window.templateEditor.setOptions({mode: 'ace/mode/django'});
@@ -150,12 +220,9 @@ async function main() {
 
     getDataFromLocationHash();
 
-    for(const editor of [window.templateEditor, window.varsEditor])
-        editor.getSession().on('change', renderTemplate);
-
     for(const editor of [window.templateEditor, window.varsEditor, window.resultEditor])
         editor.setOptions({
-            theme: 'ace/theme/twilight',
+            theme: "ace/theme/" + (isInDarkMode ? "twilight" : "chrome"),
             wrap: true,
             showGutter: true,
             fadeFoldWidgets: false,
@@ -165,6 +232,9 @@ async function main() {
         });
 
     document.body.classList.add('loaded');
+
+    for(const editor of [window.templateEditor, window.varsEditor])
+        editor.getSession().on('change', renderTemplate);
 
     await renderTemplate();
 }
