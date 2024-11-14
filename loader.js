@@ -195,9 +195,8 @@ function copyLinkToClipboard() {
 }
 
 function getDataFromLocationHash() {
+    let loadedFromHash = false;
     try {
-        if(!window.location.hash || window.location.hash.length <= 1)
-            return;
         let hash = window.location.hash.substring(1);
         hash = hash.replace(/-/g, '+').replace(/_/g, '/');
         const charCodeArray = Array.from(window.atob(hash)).map((char) => char.charCodeAt(0));
@@ -205,10 +204,19 @@ function getDataFromLocationHash() {
         window.templateEditor.getSession().setValue(obj.templateString);
         window.varsEditor.getSession().setValue(obj.variablesString);
         window.location.hash = '';
+        loadedFromHash = true;
     }
-    catch {
-        window.templateEditor.getSession().setValue(localStorage.getItem('templateString') || 'Hello, {{ name }}!');
-        window.varsEditor.getSession().setValue(localStorage.getItem('variablesString') || '{"name": "World"}');
+    catch {}
+
+    if(!loadedFromHash) {
+        if (localStorage.getItem('templateString') && localStorage.getItem('variablesString')) {
+            window.templateEditor.getSession().setValue(localStorage.getItem('templateString'));
+            window.varsEditor.getSession().setValue(localStorage.getItem('variablesString'));
+        }
+        else {
+            window.templateEditor.getSession().setValue('Hello, {{ name }}!');
+            window.varsEditor.getSession().setValue('{"name": "World"}');
+        }
     }
 }
 
