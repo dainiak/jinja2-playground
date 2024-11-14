@@ -196,12 +196,15 @@ function copyLinkToClipboard() {
 
 function getDataFromLocationHash() {
     try {
+        if(!window.location.hash || window.location.hash.length <= 1)
+            return;
         let hash = window.location.hash.substring(1);
         hash = hash.replace(/-/g, '+').replace(/_/g, '/');
         const charCodeArray = Array.from(window.atob(hash)).map((char) => char.charCodeAt(0));
         const obj = JSON.parse(pako.inflate(new Uint8Array(charCodeArray), { to: 'string' }));
         window.templateEditor.getSession().setValue(obj.templateString);
         window.varsEditor.getSession().setValue(obj.variablesString);
+        window.location.hash = '';
     }
     catch {
         window.templateEditor.getSession().setValue(localStorage.getItem('templateString') || 'Hello, {{ name }}!');
@@ -227,7 +230,7 @@ async function main() {
 
     getDataFromLocationHash();
 
-    for(const editor of [window.templateEditor, window.varsEditor, window.resultEditor])
+    for(const editor of [window.templateEditor, window.varsEditor, window.resultEditor]) {
         editor.setOptions({
             theme: "ace/theme/" + (isInDarkMode ? "twilight" : "chrome"),
             wrap: true,
@@ -237,6 +240,8 @@ async function main() {
             showPrintMargin: false,
             highlightActiveLine: true
         });
+        editor.commands.removeCommand('gotoline');
+    }
 
     document.body.classList.add('loaded');
 
