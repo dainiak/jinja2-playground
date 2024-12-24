@@ -121,14 +121,18 @@ except Exception as e:
 
 json.dumps(result)
 `));
-    if(undefinedVariablesDiagnostics.length > 0 && undefinedVars.length > 0) {
+    if(undefinedVariablesDiagnostics.length > 0) {
         const [errorClass, errorText, line, col] = undefinedVariablesDiagnostics;
         if(errorClass === 'UndefinedError') {
-            let undefinedVar = errorText.match(/'(.*)' is undefined/)[1];
-            if(undefinedVars.includes(undefinedVar))
+            let undefinedVarMatch = errorText.match(/.*'([^']*)' is undefined.*/);
+            if (!undefinedVarMatch)
+                undefinedVarMatch = errorText.match(/.* has no attribute '([^']*)'.*/);
+            let undefinedVar = null;
+            if(undefinedVarMatch)
+                undefinedVar = undefinedVarMatch[1].trim();
+            if(!undefinedVars.includes(undefinedVar))
                 undefinedVars = [undefinedVar, ...undefinedVars.filter(v => v !== undefinedVar)];
         }
-
         window.templateEditor.getSession().setAnnotations([{
             row: line - 1,
             col: col,
