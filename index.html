@@ -24,6 +24,20 @@
         <div class="col-md-6 d-flex flex-column" style="min-height: 0;">
             <div class="left-col-container d-flex flex-column" style="min-height: 0;">
                 <h3>Template</h3>
+                <div id="env-options" class="d-flex gap-3 mb-1">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="opt-trim-blocks">
+                        <label class="form-check-label small" for="opt-trim-blocks">trim_blocks</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="opt-lstrip-blocks">
+                        <label class="form-check-label small" for="opt-lstrip-blocks">lstrip_blocks</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="opt-keep-trailing-newline">
+                        <label class="form-check-label small" for="opt-keep-trailing-newline">keep_trailing_newline</label>
+                    </div>
+                </div>
                 <div id="template"></div>
             </div>
             <div class="left-col-container d-flex flex-column" style="min-height: 0;">

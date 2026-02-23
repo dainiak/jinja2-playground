@@ -54,3 +54,7 @@ body:not(.loaded) #main {
     opacity: 0.3;
 }
 
+#env-options label {
+    user-select: none;
+}
+

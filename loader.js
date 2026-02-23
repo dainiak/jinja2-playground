@@ -10,7 +10,14 @@ from jinja2 import Template, Environment, StrictUndefined
 from jinja2.meta import find_undeclared_variables
 from datetime import datetime
 
-def render_and_diagnose(template_str, variables_str):
+def render_and_diagnose(template_str, variables_str, env_options_json='{}'):
+    env_options = json.loads(env_options_json)
+    env_kwargs = {
+        'trim_blocks': env_options.get('trim_blocks', False),
+        'lstrip_blocks': env_options.get('lstrip_blocks', False),
+        'keep_trailing_newline': env_options.get('keep_trailing_newline', False),
+    }
+
     result = {
         "templateError": None,
         "variablesError": None,
@@ -23,7 +30,7 @@ def render_and_diagnose(template_str, variables_str):
     # 1. Parse template
     parsed_content = None
     try:
-        parsed_content = Environment().parse(template_str)
+        parsed_content = Environment(**env_kwargs).parse(template_str)
     except Exception as e:
         tb = traceback.extract_tb(e.__traceback__)[-1]
         result["templateError"] = {
@@ -67,7 +74,7 @@ def render_and_diagnose(template_str, variables_str):
 
     # 4. Detect undefined attributes via StrictUndefined render
     try:
-        Template(template_str, undefined=StrictUndefined).render(user_dict)
+        Environment(undefined=StrictUndefined, **env_kwargs).from_string(template_str).render(user_dict)
     except Exception as e:
         tb = traceback.extract_tb(e.__traceback__)[-1]
         if e.__class__.__name__ == "UndefinedError":
@@ -86,7 +93,7 @@ def render_and_diagnose(template_str, variables_str):
 
     # 5. Final render (permissive)
     try:
-        result["output"] = Template(template_str).render(user_dict)
+        result["output"] = Environment(**env_kwargs).from_string(template_str).render(user_dict)
     except Exception as e:
         tb = traceback.extract_tb(e.__traceback__)[-1]
         result["renderError"] = {
@@ -107,14 +114,30 @@ def render_and_diagnose(template_str, variables_str):
         };
     }
 
+    function getEnvOptions() {
+        return {
+            trim_blocks: document.getElementById('opt-trim-blocks').checked,
+            lstrip_blocks: document.getElementById('opt-lstrip-blocks').checked,
+            keep_trailing_newline: document.getElementById('opt-keep-trailing-newline').checked,
+        };
+    }
+
+    function setEnvOptions(opts) {
+        document.getElementById('opt-trim-blocks').checked = !!opts.trim_blocks;
+        document.getElementById('opt-lstrip-blocks').checked = !!opts.lstrip_blocks;
+        document.getElementById('opt-keep-trailing-newline').checked = !!opts.keep_trailing_newline;
+    }
+
     async function renderTemplate() {
         const thisVersion = ++renderVersion;
 
         const templateString = templateEditor.getSession().getValue();
         const variablesString = varsEditor.getSession().getValue();
+        const envOptions = getEnvOptions();
 
         localStorage.setItem('templateString', templateString);
         localStorage.setItem('variablesString', variablesString);
+        localStorage.setItem('envOptions', JSON.stringify(envOptions));
 
         for (const editor of [varsEditor, templateEditor, resultEditor])
             editor.getSession().clearAnnotations();
@@ -123,8 +146,9 @@ def render_and_diagnose(template_str, variables_str):
         try {
             window.pyodide.globals.set("_template_str", templateString);
             window.pyodide.globals.set("_variables_str", variablesString);
+            window.pyodide.globals.set("_env_options", JSON.stringify(envOptions));
             diagnostics = JSON.parse(window.pyodide.runPython(
-                `json.dumps(render_and_diagnose(_template_str, _variables_str))`
+                `json.dumps(render_and_diagnose(_template_str, _variables_str, _env_options))`
             ));
         } catch (error) {
             console.error("Pyodide execution error:", error);
@@ -143,7 +167,7 @@ def render_and_diagnose(template_str, variables_str):
                 type: 'error'
             }]);
             resultEditor.getSession().setValue(`Error in the template text:\n${e.cls}: ${e.msg}`);
-            setSharingLink({ templateString, variablesString });
+            setSharingLink({ templateString, variablesString, envOptions });
             return;
         }
 
@@ -163,7 +187,7 @@ def render_and_diagnose(template_str, variables_str):
                 type: 'error'
             }]);
             resultEditor.getSession().setValue(`Error in the variable definitions:\n${e.cls}: ${errorText}`);
-            setSharingLink({ templateString, variablesString });
+            setSharingLink({ templateString, variablesString, envOptions });
             return;
         }
 
@@ -199,7 +223,7 @@ def render_and_diagnose(template_str, variables_str):
             resultEditor.getSession().setValue(diagnostics.output);
         }
 
-        setSharingLink({ templateString, variablesString });
+        setSharingLink({ templateString, variablesString, envOptions });
     }
 
     const debouncedRender = debounce(renderTemplate, 250);
@@ -243,6 +267,7 @@ def render_and_diagnose(template_str, variables_str):
             const obj = JSON.parse(pako.inflate(new Uint8Array(charCodeArray), { to: 'string' }));
             templateEditor.getSession().setValue(obj.templateString);
             varsEditor.getSession().setValue(obj.variablesString);
+            if (obj.envOptions) setEnvOptions(obj.envOptions);
             window.location.hash = '';
             loadedFromHash = true;
         } catch (error) {
@@ -259,6 +284,10 @@ def render_and_diagnose(template_str, variables_str):
                 templateEditor.getSession().setValue('Hello, {{ name }}!');
                 varsEditor.getSession().setValue('{"name": "World"}');
             }
+            try {
+                const stored = JSON.parse(localStorage.getItem('envOptions'));
+                if (stored) setEnvOptions(stored);
+            } catch (_) {}
         }
     }
 
@@ -309,6 +338,9 @@ def render_and_diagnose(template_str, variables_str):
 
         for (const editor of [templateEditor, varsEditor])
             editor.getSession().on('change', debouncedRender);
+
+        for (const id of ['opt-trim-blocks', 'opt-lstrip-blocks', 'opt-keep-trailing-newline'])
+            document.getElementById(id).addEventListener('change', debouncedRender);
 
         await renderTemplate();
     }
