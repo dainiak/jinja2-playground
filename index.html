@@ -13,25 +13,25 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.min.js" integrity="sha512-ykZ1QQr0Jy/4ZkvKuqWn4iF3lqPZyij9iRv6sGqLRdTPkY69YX6+7wvVGmsdBbiIfN/8OdsI7HABjvEok6ZopQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdn.jsdelivr.net/pyodide/v0.26.3/full/pyodide.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.36.4/ace.min.js" integrity="sha512-9xNuS6O4ZXZdCVDekkW4ApP8MfH2SCyK7Wsd4g0l3KDmbNld2vsozYGY6kQup0VKB0iT89cLj/DiRSV7WjfUaw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.43.3/ace.min.js" integrity="sha512-BHJlu9vUXVrcxhRwbBdNv3uTsbscp8pp3LJ5z/sw9nBJUegkNlkcZnvODRgynJWhXMCsVUGZlFuzTrr5I2X3sQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js" integrity="sha512-g2TeAWw5GPnX7z0Kn8nFbYfeHcvAu/tx6d6mrLe/90mkCxO+RcptyYpksUz35EO337F83bZwcmUyHiHamspkfg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
-<div id="loader"><h1>Loading… Takes about 2—9 seconds.</h1><div class="lds-spinner"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div></div>
+<div id="loader"><h1>Loading… Takes about 2—9 seconds.</h1><div class="spinner-border text-light mt-3" role="status"><span class="visually-hidden">Loading...</span></div></div>
 
-<div id="main" class="container fluid mt-5 h-100">
-    <div class="row h-100">
-        <div class="col-md-6 d-flex flex-column">
-            <div class="left-col-container d-flex flex-column">
+<div id="main" class="container-fluid mt-3 d-flex flex-column" style="height: calc(100dvh - 1rem);">
+    <div class="row flex-fill" style="min-height: 0;">
+        <div class="col-md-6 d-flex flex-column" style="min-height: 0;">
+            <div class="left-col-container d-flex flex-column" style="min-height: 0;">
                 <h3>Template</h3>
                 <div id="template"></div>
             </div>
-            <div class="left-col-container d-flex flex-column">
+            <div class="left-col-container d-flex flex-column" style="min-height: 0;">
                 <h3 class="mt-3">Variables (as Python dict)</h3>
                 <div id="variables"></div>
             </div>
         </div>
-        <div class="col-md-6 d-flex flex-column">
+        <div class="col-md-6 d-flex flex-column" style="min-height: 0;">
 
             <div class="d-flex flex-row justify-content-between">
                 <h3>Output</h3>
@@ -43,6 +43,6 @@
     </div>
 </div>
 
-<script type="text/javascript" src="loader.js"></script>
+<script src="loader.js"></script>
 </body>
 </html>
